@@ -1,0 +1,63 @@
+name: 'Sync Forks'
+description: 'Sync all matching fork repos in an org with their upstream via the merge-upstream API'
+inputs:
+  github-token:
+    description: 'Token with repo access (used as GH_TOKEN for gh CLI)'
+    required: true
+  org:
+    description: 'Organization to scan'
+    required: false
+    default: ${{ github.repository_owner }}
+  pattern:
+    description: 'Substring that a repo name must contain to be treated as a syncable fork'
+    required: false
+    default: '--'
+outputs:
+  all-repo-names:
+    description: 'Comma-separated names of every repo in the org (fork or not)'
+    value: ${{ steps.sync.outputs.all_names }}
+  synced:
+    description: 'Number of forks successfully synced'
+    value: ${{ steps.sync.outputs.synced }}
+  total:
+    description: 'Number of forks matched by pattern'
+    value: ${{ steps.sync.outputs.total }}
+runs:
+  using: composite
+  steps:
+    - id: sync
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        ORG: ${{ inputs.org }}
+        PATTERN: ${{ inputs.pattern }}
+      run: |
+        set -euo pipefail
+
+        repos="$RUNNER_TEMP/repos.tsv"
+        gh api --paginate "orgs/$ORG/repos?type=all&per_page=100" \
+          --jq '.[] | [.name, .default_branch, .fork] | @tsv' > "$repos"
+        echo "all_names=$(cut -f1 "$repos" | paste -sd, -)" >> "$GITHUB_OUTPUT"
+
+        total=$(awk -F'\t' -v p="$PATTERN" 'index($1,p) && $3 == "true"' "$repos" | wc -l)
+        done_count=0
+        failed=()
+        while IFS=$'\t' read -r repo branch fork; do
+          [[ "$repo" == *"$PATTERN"* && "$fork" == "true" ]] || continue
+          done_count=$((done_count + 1))
+          echo "[$done_count/$total] Syncing $ORG/$repo ($branch)"
+          if ! gh repo sync "$ORG/$repo" --branch "$branch"; then
+            echo "::warning::Normal sync failed for $repo; retrying with --force"
+            gh repo sync "$ORG/$repo" --branch "$branch" --force || failed+=("$repo")
+          fi
+        done < "$repos"
+
+        succeeded=$((total - ${#failed[@]}))
+        echo "synced=$succeeded" >> "$GITHUB_OUTPUT"
+        echo "total=$total" >> "$GITHUB_OUTPUT"
+        echo "Synced $succeeded/$total repos" | tee -a "$GITHUB_STEP_SUMMARY"
+
+        ((${#failed[@]} == 0)) || {
+          echo "::error::Failed to sync: ${failed[*]}"
+          exit 1
+        }
