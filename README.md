@@ -40,3 +40,5 @@ and it is a fork; on merge-upstream failure it retries with `gh repo sync --forc
 
 - 🏠 组织主页：<https://github.com/farfarfun-action>
 - 📧 联系：farfarfun@qq.com
+
+本项目基于 [MIT](LICENSE) 协议开源。
