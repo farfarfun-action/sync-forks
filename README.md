@@ -30,3 +30,13 @@ and it is a fork; on merge-upstream failure it retries with `gh repo sync --forc
   with:
     github-token: ${{ secrets.ACTION_GITHUB_TOKEN }}
 ```
+
+---
+
+## 关于 farfarfun-action
+
+[farfarfun](https://github.com/farfarfun) 的 GitHub Action 产品线：把组织级的仓库维护
+动作（fork 批量同步、跨平台仓库镜像）封装成可直接复用的 Action。
+
+- 🏠 组织主页：<https://github.com/farfarfun-action>
+- 📧 联系：farfarfun@qq.com
